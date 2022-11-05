@@ -200,9 +200,11 @@ public class MappedFile extends ReferenceResource {
         assert messageExt != null;
         assert cb != null;
 
+        // 当前MappedFile文件的写入位置
         int currentPos = this.wrotePosition.get();
 
         if (currentPos < this.fileSize) {
+            // TODO: Chase Wang   buffer 和同步刷盘/异步刷盘相关（异 步刷盘有两种刷盘模式）
             ByteBuffer byteBuffer = writeBuffer != null ? writeBuffer.slice() : this.mappedByteBuffer.slice();
             byteBuffer.position(currentPos);
             AppendMessageResult result;
@@ -213,6 +215,7 @@ public class MappedFile extends ReferenceResource {
             } else {
                 return new AppendMessageResult(AppendMessageStatus.UNKNOWN_ERROR);
             }
+            // 刷新写入位置  wroteBytes：物理偏移量 commitlog 位置+消息存储的位置
             this.wrotePosition.addAndGet(result.getWroteBytes());
             this.storeTimestamp = result.getStoreTimestamp();
             return result;
