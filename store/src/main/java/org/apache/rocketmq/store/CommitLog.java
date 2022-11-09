@@ -240,6 +240,7 @@ public class CommitLog {
      */
     public DispatchRequest checkMessageAndReturnSize(java.nio.ByteBuffer byteBuffer, final boolean checkCRC,
         final boolean readBody) {
+        // 读取一个完整的MSG，返回DispatchRequest对象
         try {
             // 1 TOTAL SIZE
             int totalSize = byteBuffer.getInt();

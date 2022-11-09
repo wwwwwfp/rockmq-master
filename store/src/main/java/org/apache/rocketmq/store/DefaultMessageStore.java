@@ -1420,13 +1420,17 @@ public class DefaultMessageStore implements MessageStore {
     }
 
     public void doDispatch(DispatchRequest req) {
+        // dispatcherList 中 存放的是 CommitLogDispatcherBuildConsumeQueue 和 CommitLogDispatcherBuildIndex 对应的构建实例
+        // 用于构建ConsumeQueue 和 Index
         for (CommitLogDispatcher dispatcher : this.dispatcherList) {
             dispatcher.dispatch(req);
         }
     }
 
     public void putMessagePositionInfo(DispatchRequest dispatchRequest) {
+        // 初始化ConsumeQueue
         ConsumeQueue cq = this.findConsumeQueue(dispatchRequest.getTopic(), dispatchRequest.getQueueId());
+        // 构建逻辑
         cq.putMessagePositionInfoWrapper(dispatchRequest);
     }
 
@@ -1487,6 +1491,7 @@ public class DefaultMessageStore implements MessageStore {
             switch (tranType) {
                 case MessageSysFlag.TRANSACTION_NOT_TYPE:
                 case MessageSysFlag.TRANSACTION_COMMIT_TYPE:
+                    // 具体构建方法
                     DefaultMessageStore.this.putMessagePositionInfo(request);
                     break;
                 case MessageSysFlag.TRANSACTION_PREPARED_TYPE:
@@ -1498,6 +1503,7 @@ public class DefaultMessageStore implements MessageStore {
 
     class CommitLogDispatcherBuildIndex implements CommitLogDispatcher {
 
+        // 构建Index
         @Override
         public void dispatch(DispatchRequest request) {
             if (DefaultMessageStore.this.messageStoreConfig.isMessageIndexEnable()) {
@@ -1812,7 +1818,11 @@ public class DefaultMessageStore implements MessageStore {
             return this.reputFromOffset < DefaultMessageStore.this.commitLog.getMaxOffset();
         }
 
+        /**
+         * 构建 ConsumeQueue/Index
+         */
         private void doReput() {
+            // TODO: Chase Wang ????
             if (this.reputFromOffset < DefaultMessageStore.this.commitLog.getMinOffset()) {
                 log.warn("The reputFromOffset={} is smaller than minPyOffset={}, this usually indicate that the dispatch behind too much and the commitlog has expired.",
                     this.reputFromOffset, DefaultMessageStore.this.commitLog.getMinOffset());
@@ -1824,19 +1834,24 @@ public class DefaultMessageStore implements MessageStore {
                     && this.reputFromOffset >= DefaultMessageStore.this.getConfirmOffset()) {
                     break;
                 }
-
+                /**
+                 * reputFromOffset：构建过的 ConsumeQueue/Index 进度
+                 * SelectMappedBufferResult：已经刷过盘的CommitLog的进度 - reputFromOffset ，就是可以构建 ConsumeQueue/Index 的消息
+                 */
                 SelectMappedBufferResult result = DefaultMessageStore.this.commitLog.getData(reputFromOffset);
                 if (result != null) {
                     try {
                         this.reputFromOffset = result.getStartOffset();
 
                         for (int readSize = 0; readSize < result.getSize() && doNext; ) {
+                            // 读取一个完整的Msg，构建对应的 DispatchRequest 对象
                             DispatchRequest dispatchRequest =
                                 DefaultMessageStore.this.commitLog.checkMessageAndReturnSize(result.getByteBuffer(), false, false);
                             int size = dispatchRequest.getBufferSize() == -1 ? dispatchRequest.getMsgSize() : dispatchRequest.getBufferSize();
 
                             if (dispatchRequest.isSuccess()) {
                                 if (size > 0) {
+                                    // 构建ConsumerQueue / Index
                                     DefaultMessageStore.this.doDispatch(dispatchRequest);
 
                                     if (BrokerRole.SLAVE != DefaultMessageStore.this.getMessageStoreConfig().getBrokerRole()

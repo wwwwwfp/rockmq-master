@@ -395,6 +395,7 @@ public class ConsumeQueue {
                         topic, queueId, request.getCommitLogOffset());
                 }
             }
+            // →
             boolean result = this.putMessagePositionInfo(request.getCommitLogOffset(),
                 request.getMsgSize(), tagsCode, request.getConsumeQueueOffset());
             if (result) {
@@ -422,6 +423,14 @@ public class ConsumeQueue {
         this.defaultMessageStore.getRunningFlags().makeLogicsQueueError();
     }
 
+    /**
+     *
+     * @param offset 需要重构 ConsumeQueue 的Message的CommitLog的物理位置
+     * @param size Message大小
+     * @param tagsCode Msg TagCode
+     * @param cqOffset 消息队列的逻辑偏移量
+     * @return
+     */
     private boolean putMessagePositionInfo(final long offset, final int size, final long tagsCode,
         final long cqOffset) {
 
@@ -436,11 +445,13 @@ public class ConsumeQueue {
         this.byteBufferIndex.putInt(size);
         this.byteBufferIndex.putLong(tagsCode);
 
+        // TODO: Chase Wang ???
         final long expectLogicOffset = cqOffset * CQ_STORE_UNIT_SIZE;
 
+        // 根据期望的逻辑便宜找到对应的MappedFile
         MappedFile mappedFile = this.mappedFileQueue.getLastMappedFile(expectLogicOffset);
         if (mappedFile != null) {
-
+            // 如果mappedFileQueue的MappedFile List被清除，需要保证消息队列的逻辑位置和ConsumeQueue文件的起始文件和偏移保持一致，要补充空的逻辑消息
             if (mappedFile.isFirstCreateInQueue() && cqOffset != 0 && mappedFile.getWrotePosition() == 0) {
                 this.minLogicOffset = expectLogicOffset;
                 this.mappedFileQueue.setFlushedWhere(expectLogicOffset);

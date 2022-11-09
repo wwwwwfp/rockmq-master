@@ -91,7 +91,10 @@ public class IndexFile {
 
     public boolean putKey(final String key, final long phyOffset, final long storeTimestamp) {
         if (this.indexHeader.getIndexCount() < this.indexNum) {
+            // indexFile 未写满
+            // 根据topic-keys 或 topic-uniquKey 计算Hash
             int keyHash = indexKeyHashMethod(key);
+            // hash 桶的位置
             int slotPos = keyHash % this.hashSlotNum;
             int absSlotPos = IndexHeader.INDEX_HEADER_SIZE + slotPos * hashSlotSize;
 
@@ -101,11 +104,12 @@ public class IndexFile {
 
                 // fileLock = this.fileChannel.lock(absSlotPos, hashSlotSize,
                 // false);
+                // 该Hash 桶上是否已经有了数据，如果有，需要记录下来，为后面构建LinkList做准备
                 int slotValue = this.mappedByteBuffer.getInt(absSlotPos);
                 if (slotValue <= invalidIndex || slotValue > this.indexHeader.getIndexCount()) {
                     slotValue = invalidIndex;
                 }
-
+                // 落地时间 - 当前索引文件的起始时间
                 long timeDiff = storeTimestamp - this.indexHeader.getBeginTimestamp();
 
                 timeDiff = timeDiff / 1000;
@@ -117,16 +121,19 @@ public class IndexFile {
                 } else if (timeDiff < 0) {
                     timeDiff = 0;
                 }
-
+                // 计算索引数据需要放在那个位置
                 int absIndexPos =
                     IndexHeader.INDEX_HEADER_SIZE + this.hashSlotNum * hashSlotSize
                         + this.indexHeader.getIndexCount() * indexSize;
-
+                // 根据topic-keys 或 topic-uniquKey 计算Hash值
                 this.mappedByteBuffer.putInt(absIndexPos, keyHash);
+                // Msg 再 CommitLog 的物理位置
                 this.mappedByteBuffer.putLong(absIndexPos + 4, phyOffset);
+                // 落地时间 - 当前索引文件的起始时间
                 this.mappedByteBuffer.putInt(absIndexPos + 4 + 8, (int) timeDiff);
+                // 在索引数据域要把刚才有冲突的Hash桶的位置记录下来，这样就构建成了一个LInkList
                 this.mappedByteBuffer.putInt(absIndexPos + 4 + 8 + 4, slotValue);
-
+                // 更新Hash桶的索引位置，如果有冲突，上面已经记录下来
                 this.mappedByteBuffer.putInt(absSlotPos, this.indexHeader.getIndexCount());
 
                 if (this.indexHeader.getIndexCount() <= 1) {
