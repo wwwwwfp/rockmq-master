@@ -571,11 +571,13 @@ public class CommitLog {
                 if (msg.getDelayTimeLevel() > this.defaultMessageStore.getScheduleMessageService().getMaxDelayLevel()) {
                     msg.setDelayTimeLevel(this.defaultMessageStore.getScheduleMessageService().getMaxDelayLevel());
                 }
-
+                // 更改Topic（SCHEDULE_TOPIC_XXXX），延时消息固定Topic
                 topic = ScheduleMessageService.SCHEDULE_TOPIC;
+                // 不同级别的延迟消息写入到不同的队列中，新的队列为 延迟级别 - 1
                 queueId = ScheduleMessageService.delayLevel2QueueId(msg.getDelayTimeLevel());
 
                 // Backup real topic, queueId
+                // 备份源 Topic 和 QueueId
                 MessageAccessor.putProperty(msg, MessageConst.PROPERTY_REAL_TOPIC, msg.getTopic());
                 MessageAccessor.putProperty(msg, MessageConst.PROPERTY_REAL_QUEUE_ID, String.valueOf(msg.getQueueId()));
                 msg.setPropertiesString(MessageDecoder.messageProperties2String(msg.getProperties()));
@@ -585,11 +587,13 @@ public class CommitLog {
             }
         }
 
+        // host地址
         InetSocketAddress bornSocketAddress = (InetSocketAddress) msg.getBornHost();
         if (bornSocketAddress.getAddress() instanceof Inet6Address) {
             msg.setBornHostV6Flag();
         }
 
+        // store地址
         InetSocketAddress storeSocketAddress = (InetSocketAddress) msg.getStoreHost();
         if (storeSocketAddress.getAddress() instanceof Inet6Address) {
             msg.setStoreHostAddressV6Flag();
@@ -618,10 +622,12 @@ public class CommitLog {
             // 创建失败，返回对应标识
             if (null == mappedFile) {
                 log.error("create mapped file1 error, topic: " + msg.getTopic() + " clientAddr: " + msg.getBornHostString());
+                // 消息写入完成后，设置 beginTimeInLock = 0 ，然后释放锁
+                // 该值是用来计算消息写入耗时，写入新消息前，会根据该值来检查操作系统内存页写入是否繁忙，如果上一条在1s内没有写入，则本条不允许在写入
                 beginTimeInLock = 0;
                 return new PutMessageResult(PutMessageStatus.CREATE_MAPEDFILE_FAILED, null);
             }
-            // 将Message 刷新到MappedFile 的内存Buffer
+            // 将Message 刷新到MappedFile 的内存  writeBuffer/mappedByteBuffer ,没有落盘
             result = mappedFile.appendMessage(msg, this.appendMessageCallback);
             switch (result.getStatus()) {
                 case PUT_OK:
@@ -639,11 +645,11 @@ public class CommitLog {
                     }
                     result = mappedFile.appendMessage(msg, this.appendMessageCallback);
                     break;
-                case MESSAGE_SIZE_EXCEEDED:
-                case PROPERTIES_SIZE_EXCEEDED:
+                case MESSAGE_SIZE_EXCEEDED:  // 消息长度超过了最大阈值
+                case PROPERTIES_SIZE_EXCEEDED: // 消息属性长度超过了最大阈值
                     beginTimeInLock = 0;
                     return new PutMessageResult(PutMessageStatus.MESSAGE_ILLEGAL, result);
-                case UNKNOWN_ERROR:
+                case UNKNOWN_ERROR:  // 未知错误
                     beginTimeInLock = 0;
                     return new PutMessageResult(PutMessageStatus.UNKNOWN_ERROR, result);
                 default:
@@ -654,7 +660,7 @@ public class CommitLog {
             elapsedTimeInLock = this.defaultMessageStore.getSystemClock().now() - beginLockTimestamp;
             beginTimeInLock = 0;
         } finally {
-            putMessageLock.unlock();
+            putMessageLock.unlock();  // 释放锁
         }
 
         if (elapsedTimeInLock > 500) {

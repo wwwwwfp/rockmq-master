@@ -387,6 +387,7 @@ public class DefaultMessageStore implements MessageStore {
             return new PutMessageResult(PutMessageStatus.PROPERTIES_SIZE_EXCEEDED, null);
         }
         // 写消息前，判断OSPageCache是否可用
+        // 如果返回true，标识有消息在写入，并且写入的消息耗时较长（超过了1s），则本条消息不再写入，保护broker
         if (this.isOSPageCacheBusy()) {
             return new PutMessageResult(PutMessageStatus.OS_PAGECACHE_BUSY, null);
         }

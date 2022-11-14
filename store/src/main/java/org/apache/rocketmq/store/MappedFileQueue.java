@@ -36,17 +36,24 @@ public class MappedFileQueue {
     private static final int DELETE_FILES_BATCH_MAX = 10;
 
     private final String storePath;
-
+    // 一个映射文件的大小
+    /**
+     * CommitLog：默认1G
+     * ConsumeQueue文件：默认 30w * 20 字节
+     */
     private final int mappedFileSize;
-
+    // mappedFile 文件集合
     private final CopyOnWriteArrayList<MappedFile> mappedFiles = new CopyOnWriteArrayList<MappedFile>();
-
+    // 预分配映射文件的服务线程
     private final AllocateMappedFileService allocateMappedFileService;
-
+    // 当前已经刷盘的物理位置，全局位置
     private long flushedWhere = 0;
+    // 当前已提交的物理位置
+    // TODO 提交？？？？
     private long committedWhere = 0;
-
+    // 当前已刷盘的最后一条消息存储的时间戳
     private volatile long storeTimestamp = 0;
+
 
     public MappedFileQueue(final String storePath, int mappedFileSize,
         AllocateMappedFileService allocateMappedFileService) {
@@ -55,6 +62,9 @@ public class MappedFileQueue {
         this.allocateMappedFileService = allocateMappedFileService;
     }
 
+    /**
+     * 检查除了最后一个文件，其他的文件大小是否 = mappedFileSize
+     */
     public void checkSelf() {
 
         if (!this.mappedFiles.isEmpty()) {
@@ -240,6 +250,8 @@ public class MappedFileQueue {
     public MappedFile getLastMappedFile() {
         MappedFile mappedFileLast = null;
 
+        // private final CopyOnWriteArrayList<MappedFile> mappedFiles = new CopyOnWriteArrayList<MappedFile>();
+        // mappedFiles 是在broker启动的时候，通过 load 方法初始化的
         while (!this.mappedFiles.isEmpty()) {
             try {
                 mappedFileLast = this.mappedFiles.get(this.mappedFiles.size() - 1);
