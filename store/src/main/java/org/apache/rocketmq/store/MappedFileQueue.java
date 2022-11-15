@@ -202,27 +202,36 @@ public class MappedFileQueue {
     }
 
     public MappedFile getLastMappedFile(final long startOffset, boolean needCreate) {
+        // 创建的MappedFile的起始偏移地址
         long createOffset = -1;
+        // 获取最后一个映射文件
         MappedFile mappedFileLast = getLastMappedFile();
-
+        // mappedFileLast 最后一个 为空，说明 mappedFiles 为空，则创建第一个映射文件
         if (mappedFileLast == null) {
+            // 计算创建的映射文件对应的物理偏移量
+            // 如果指定的 startOffset 不足 mappedFileSize， 则从offset 0 开始，否则从为mappedFileSize 整数倍的offset开始
             createOffset = startOffset - (startOffset % this.mappedFileSize);
         }
-
+        // 最后一个已经写满，计算新的offset
         if (mappedFileLast != null && mappedFileLast.isFull()) {
+            // createOffset 将要创建的映射文件的物理偏移量
+            // 上一个commitLog文件的起始偏移量 + 文件大小mappedFileSize（1G）
             createOffset = mappedFileLast.getFileFromOffset() + this.mappedFileSize;
         }
-
+        // 创建
         if (createOffset != -1 && needCreate) {
+            // 需要创建的CommitLog文件的全路径
             String nextFilePath = this.storePath + File.separator + UtilAll.offset2FileName(createOffset);
+            // 预创建的CommitLog文件的全路径（当前创建文件的下一个文件）
             String nextNextFilePath = this.storePath + File.separator
                 + UtilAll.offset2FileName(createOffset + this.mappedFileSize);
             MappedFile mappedFile = null;
-
+            // 优先通过 allocateMappedFileService 创建映射文件，因为是预分配方式，性能高
             if (this.allocateMappedFileService != null) {
                 mappedFile = this.allocateMappedFileService.putRequestAndReturnMappedFile(nextFilePath,
                     nextNextFilePath, this.mappedFileSize);
             } else {
+                // 如果 allocateMappedFileService = null ， 则通过new 的方式创建
                 try {
                     mappedFile = new MappedFile(nextFilePath, this.mappedFileSize);
                 } catch (IOException e) {
