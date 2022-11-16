@@ -484,18 +484,28 @@ public class MappedFile extends ReferenceResource {
         this.committedPosition.set(pos);
     }
 
+    /**
+     * 先对当前文件的每一个内存页写入一个字节0 ，当刷盘策略为同步刷盘时，执行强制刷盘，并且是每修改pages个分页刷一磁盘
+     * 然后将当前映射文件全部的地址空间锁定在物理存储中，防止被交换到swap空间
+     * 再调用madvise，传入WILL_NEED策略，将刚刚锁住的内存预热，起始就是告诉内核，我马上要用（WILL_NEED）这款内存，先做虚拟内存到物理内存的映射
+     * @param type 刷盘策略
+     * @param pages 预热时一次输盘的分页数
+     */
     public void warmMappedFile(FlushDiskType type, int pages) {
         long beginTime = System.currentTimeMillis();
         ByteBuffer byteBuffer = this.mappedByteBuffer.slice();
-        int flush = 0;
+        int flush = 0; //记录上一次刷盘的字节数
         long time = System.currentTimeMillis();
         for (int i = 0, j = 0; i < this.fileSize; i += MappedFile.OS_PAGE_SIZE, j++) {
+            // 写入假值
             byteBuffer.put(i, (byte) 0);
             // force flush when flush disk type is sync
+            // 当刷盘策略为同步刷盘时，执行强制刷盘
+            // 每修改pages个分页刷一次盘
             if (type == FlushDiskType.SYNC_FLUSH) {
                 if ((i / OS_PAGE_SIZE) - (flush / OS_PAGE_SIZE) >= pages) {
                     flush = i;
-                    mappedByteBuffer.force();
+                    mappedByteBuffer.force(); // 强制刷盘
                 }
             }
 
@@ -504,6 +514,13 @@ public class MappedFile extends ReferenceResource {
                 log.info("j={}, costTime={}", j, System.currentTimeMillis() - time);
                 time = System.currentTimeMillis();
                 try {
+                    /**
+                     * Linux 系统中CPU的调度策略是基于时间片的，每个任务CPU会分配一个时间片，时间到了之后，会剥夺CPU执行，不让再执行，换到下一个任务执行
+                     * Windows：基于抢占式的方式执行的，如果当前线程不主动放弃执行权，他会一直去执行，其他线程就没法去执行
+                     */
+                    // 防止当前线程一直抢占CPU执行权，
+                    // 在本次循环中，因为文件大小是1G，而单次循环是4k，所以避免一直被当前线程占用，到这里先通过该行代码让出CPU执行权，
+                    // 当前线程就会从等待状态进入就绪状态，等待下一次的执行
                     Thread.sleep(0);
                 } catch (InterruptedException e) {
                     log.error("Interrupted", e);
@@ -519,7 +536,7 @@ public class MappedFile extends ReferenceResource {
         }
         log.info("mapped file warm-up done. mappedFile={}, costTime={}", this.getFileName(),
             System.currentTimeMillis() - beginTime);
-
+        // 预热
         this.mlock();
     }
 
@@ -547,11 +564,17 @@ public class MappedFile extends ReferenceResource {
         this.firstCreateInQueue = firstCreateInQueue;
     }
 
+    /**
+     * 将当前映射文件全部的地址空间锁定在物理存储中，防止被交换到swap空间
+     * 再调用madvise，传入WILL_NEED策略，将刚刚锁住的内存预热，起始就是告诉内核，我马上要用（WILL_NEED）这款内存，先做虚拟内存到物理内存的映射
+     */
     public void mlock() {
         final long beginTime = System.currentTimeMillis();
         final long address = ((DirectBuffer) (this.mappedByteBuffer)).address();
         Pointer pointer = new Pointer(address);
         {
+            // buffer是通过mmap 内存映射的方式映射到一个虚拟内存的，映射后是一个虚拟的地址空间
+            // 这个虚拟地址空间并不能再真正的物理内存上找到正在地空间的对应
             int ret = LibC.INSTANCE.mlock(pointer, new NativeLong(this.fileSize));
             log.info("mlock {} {} {} ret = {} time consuming = {}", address, this.fileName, this.fileSize, ret, System.currentTimeMillis() - beginTime);
         }

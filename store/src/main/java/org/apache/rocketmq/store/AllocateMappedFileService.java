@@ -236,6 +236,7 @@ public class AllocateMappedFileService extends ServiceThread {
             }
         } finally {
             if (req != null && isSuccess)
+                // 唤醒等待的线程，从requestQueue中再取下一个MappedFile做重复的工作
                 req.getCountDownLatch().countDown();
         }
         return true;
