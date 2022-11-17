@@ -204,8 +204,10 @@ public class MappedFile extends ReferenceResource {
         int currentPos = this.wrotePosition.get();
 
         if (currentPos < this.fileSize) {
-            // TODO: Chase Wang   buffer 和同步刷盘/异步刷盘相关（异 步刷盘有两种刷盘模式）
+            // writeBuffer / mappedByteBuffer 的 position始终为0，limit始终等于capacity
+            // slice 是根据 position 和 limit 来生成 writeBuffer
             ByteBuffer byteBuffer = writeBuffer != null ? writeBuffer.slice() : this.mappedByteBuffer.slice();
+            // 设置写的起始位置
             byteBuffer.position(currentPos);
             AppendMessageResult result;
             if (messageExt instanceof MessageExtBrokerInner) {
@@ -536,7 +538,11 @@ public class MappedFile extends ReferenceResource {
         }
         log.info("mapped file warm-up done. mappedFile={}, costTime={}", this.getFileName(),
             System.currentTimeMillis() - beginTime);
-        // 预热
+
+        /**
+         * 操作系统中其他进程再做一些其它操作的时候，可能有一些情况导致内存不够，会导致以上操作过的一些内存会被回收
+         * 为了防止这种情况，通过mlock的方式，将以上操作过的这些地址空间锁死在磁盘中，防止其它进程将内存置换到其它进程
+         */
         this.mlock();
     }
 
