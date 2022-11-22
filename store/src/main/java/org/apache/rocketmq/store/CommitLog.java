@@ -688,7 +688,7 @@ public class CommitLog {
         // Synchronization flush
         // 同步输盘逻辑
         if (FlushDiskType.SYNC_FLUSH == this.defaultMessageStore.getMessageStoreConfig().getFlushDiskType()) {
-            // todo ？？？？？？？？？？？？？？
+            // service
             final GroupCommitService service = (GroupCommitService) this.flushCommitLogService;
             // 客户端需要等待刷盘成功OK标识
             if (messageExt.isWaitStoreMsgOK()) {

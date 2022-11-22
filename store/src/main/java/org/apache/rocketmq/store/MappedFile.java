@@ -348,6 +348,8 @@ public class MappedFile extends ReferenceResource {
             return true;
         }
 
+        // 0 强制刷盘
+        // 如果不是强制刷盘，为了提升效率，消息累计到一定的量（可配置）后统一刷盘
         if (flushLeastPages > 0) {
             return ((write / OS_PAGE_SIZE) - (flush / OS_PAGE_SIZE)) >= flushLeastPages;
         }
