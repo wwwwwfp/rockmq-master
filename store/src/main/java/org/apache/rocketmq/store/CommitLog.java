@@ -686,11 +686,18 @@ public class CommitLog {
 
     public void handleDiskFlush(AppendMessageResult result, PutMessageResult putMessageResult, MessageExt messageExt) {
         // Synchronization flush
+        // 同步输盘逻辑
         if (FlushDiskType.SYNC_FLUSH == this.defaultMessageStore.getMessageStoreConfig().getFlushDiskType()) {
+            // todo ？？？？？？？？？？？？？？
             final GroupCommitService service = (GroupCommitService) this.flushCommitLogService;
+            // 客户端需要等待刷盘成功OK标识
             if (messageExt.isWaitStoreMsgOK()) {
+                // 创建刷盘请求
+                // result.getWroteOffset() + result.getWroteBytes() 当前写入的位置+写入的字节数 = 下一个offset
                 GroupCommitRequest request = new GroupCommitRequest(result.getWroteOffset() + result.getWroteBytes());
+
                 service.putRequest(request);
+                // 等待 GroupCommitService 刷盘
                 boolean flushOK = request.waitForFlush(this.defaultMessageStore.getMessageStoreConfig().getSyncFlushTimeout());
                 if (!flushOK) {
                     log.error("do groupcommit, wait for flush failed, topic: " + messageExt.getTopic() + " tags: " + messageExt.getTags()
@@ -698,6 +705,8 @@ public class CommitLog {
                     putMessageResult.setPutMessageStatus(PutMessageStatus.FLUSH_DISK_TIMEOUT);
                 }
             } else {
+                // Broker配置了同步，客户端不关心是否已刷盘成功
+                // 同步刷盘策略退化成异步刷盘策略
                 service.wakeup();
             }
         }
@@ -1091,9 +1100,9 @@ public class CommitLog {
     }
 
     public static class GroupCommitRequest {
-        private final long nextOffset;
-        private final CountDownLatch countDownLatch = new CountDownLatch(1);
-        private volatile boolean flushOK = false;
+        private final long nextOffset;  // 映射文件缓冲区位置，想要刷盘的位置
+        private final CountDownLatch countDownLatch = new CountDownLatch(1); // 同步阻塞
+        private volatile boolean flushOK = false; // 刷盘是否成功标识
 
         public GroupCommitRequest(long nextOffset) {
             this.nextOffset = nextOffset;
@@ -1130,7 +1139,9 @@ public class CommitLog {
             synchronized (this.requestsWrite) {
                 this.requestsWrite.add(request);
             }
+            // 工作线程还没结束，新的请求就不用通知
             if (hasNotified.compareAndSet(false, true)) {
+                // 如果工作线程在等待，就提前唤醒工作线程
                 waitPoint.countDown(); // notify
             }
         }
@@ -1178,7 +1189,9 @@ public class CommitLog {
 
             while (!this.isStopped()) {
                 try {
+                    // 等待通知，如果有新数据，可提前结束等待
                     this.waitForRunning(10);
+                    // 执行刷盘
                     this.doCommit();
                 } catch (Exception e) {
                     CommitLog.log.warn(this.getServiceName() + " service has exception. ", e);
