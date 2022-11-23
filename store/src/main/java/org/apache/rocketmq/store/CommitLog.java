@@ -713,8 +713,10 @@ public class CommitLog {
         // Asynchronous flush
         else {
             if (!this.defaultMessageStore.getMessageStoreConfig().isTransientStorePoolEnable()) {
+                // FlushRealTimeService
                 flushCommitLogService.wakeup();
             } else {
+                // CommitRealTimeService
                 commitLogService.wakeup();
             }
         }
@@ -1026,11 +1028,13 @@ public class CommitLog {
             CommitLog.log.info(this.getServiceName() + " service started");
 
             while (!this.isStopped()) {
+                // 定时刷盘开关
                 boolean flushCommitLogTimed = CommitLog.this.defaultMessageStore.getMessageStoreConfig().isFlushCommitLogTimed();
-
+                // 定时刷盘周期间隔
                 int interval = CommitLog.this.defaultMessageStore.getMessageStoreConfig().getFlushIntervalCommitLog();
+                // 每次刷盘最少页
                 int flushPhysicQueueLeastPages = CommitLog.this.defaultMessageStore.getMessageStoreConfig().getFlushCommitLogLeastPages();
-
+                // 即使没有达到页数，超出一定的时间也要刷盘
                 int flushPhysicQueueThoroughInterval =
                     CommitLog.this.defaultMessageStore.getMessageStoreConfig().getFlushCommitLogThoroughInterval();
 
@@ -1048,6 +1052,7 @@ public class CommitLog {
                     if (flushCommitLogTimed) {
                         Thread.sleep(interval);
                     } else {
+                        // 有数据要落地的通知过来，提前结束等待
                         this.waitForRunning(interval);
                     }
 
@@ -1056,9 +1061,11 @@ public class CommitLog {
                     }
 
                     long begin = System.currentTimeMillis();
+                    // flush
                     CommitLog.this.mappedFileQueue.flush(flushPhysicQueueLeastPages);
                     long storeTimestamp = CommitLog.this.mappedFileQueue.getStoreTimestamp();
                     if (storeTimestamp > 0) {
+                        // 更新checkpoint的commitLog最后落地时间
                         CommitLog.this.defaultMessageStore.getStoreCheckpoint().setPhysicMsgTimestamp(storeTimestamp);
                     }
                     long past = System.currentTimeMillis() - begin;
@@ -1147,6 +1154,7 @@ public class CommitLog {
         }
 
         private void swapRequests() {
+            // swap 操作
             List<GroupCommitRequest> tmp = this.requestsWrite;
             this.requestsWrite = this.requestsRead;
             this.requestsRead = tmp;
@@ -1159,22 +1167,33 @@ public class CommitLog {
                         // There may be a message in the next file, so a maximum of
                         // two times the flush
                         boolean flushOK = false;
+                        /**
+                         * why 2 ？？
+                         * 如果这个处理周期有新的MappedFile产生，新的MappedFile要重新触发一次
+                         */
                         for (int i = 0; i < 2 && !flushOK; i++) {
+                            /**
+                             * CommitLog.this.mappedFileQueue.getFlushedWhere()：commitLog已经落地的位置
+                             * req.getNextOffset()：MappedFile的内存缓冲区的位置
+                             */
+                            // 因为是异步线程处理，可能在其它线程已经处理了，本线程中不需要再处理
                             flushOK = CommitLog.this.mappedFileQueue.getFlushedWhere() >= req.getNextOffset();
 
                             if (!flushOK) {
+                                // 刷盘
                                 CommitLog.this.mappedFileQueue.flush(0);
                             }
                         }
-
+                        // 唤醒等待刷盘的线程
                         req.wakeupCustomer(flushOK);
                     }
 
                     long storeTimestamp = CommitLog.this.mappedFileQueue.getStoreTimestamp();
                     if (storeTimestamp > 0) {
+                        // 更新checkpoint文件的CommitLog最后落地时间
                         CommitLog.this.defaultMessageStore.getStoreCheckpoint().setPhysicMsgTimestamp(storeTimestamp);
                     }
-
+                    // 置空，便于下一次swap
                     this.requestsRead.clear();
                 } else {
                     // Because of individual messages is set to not sync flush, it

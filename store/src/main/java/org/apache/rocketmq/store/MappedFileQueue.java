@@ -445,11 +445,14 @@ public class MappedFileQueue {
 
     public boolean flush(final int flushLeastPages) {
         boolean result = true;
+        // 根据最近的刷盘位置找到MappedFile文件
         MappedFile mappedFile = this.findMappedFileByOffset(this.flushedWhere, this.flushedWhere == 0);
         if (mappedFile != null) {
             long tmpTimeStamp = mappedFile.getStoreTimestamp();
+            // flush
             int offset = mappedFile.flush(flushLeastPages);
             long where = mappedFile.getFileFromOffset() + offset;
+            // 刷新了数据  where > flushedWhere  返回false ，否则 返回true
             result = where == this.flushedWhere;
             this.flushedWhere = where;
             if (0 == flushLeastPages) {

@@ -281,14 +281,16 @@ public class MappedFile extends ReferenceResource {
                 try {
                     //We only append data to fileChannel or mappedByteBuffer, never both.
                     if (writeBuffer != null || this.fileChannel.position() != 0) {
+                        // NIO
                         this.fileChannel.force(false);
                     } else {
+                        // TransientStorePool
                         this.mappedByteBuffer.force();
                     }
                 } catch (Throwable e) {
                     log.error("Error occurred when force data to disk.", e);
                 }
-
+                // setFlushedPosition
                 this.flushedPosition.set(value);
                 this.release();
             } else {
@@ -341,8 +343,9 @@ public class MappedFile extends ReferenceResource {
     }
 
     private boolean isAbleToFlush(final int flushLeastPages) {
-        int flush = this.flushedPosition.get();
-        int write = getReadPosition();
+
+        int flush = this.flushedPosition.get(); // 已刷盘位置
+        int write = getReadPosition(); // 要写的位置
 
         if (this.isFull()) {
             return true;
