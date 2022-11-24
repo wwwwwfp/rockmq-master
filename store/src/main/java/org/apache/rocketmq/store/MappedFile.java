@@ -306,8 +306,10 @@ public class MappedFile extends ReferenceResource {
             //no need to commit data to file channel, so just regard wrotePosition as committedPosition.
             return this.wrotePosition.get();
         }
+        // 是否满足commit要求，实现参考FlushRealTimeService中flush相关逻辑
         if (this.isAbleToCommit(commitLeastPages)) {
             if (this.hold()) {
+                // 将堆外内存中的数据commit到内存
                 commit0(commitLeastPages);
                 this.release();
             } else {
@@ -334,6 +336,7 @@ public class MappedFile extends ReferenceResource {
                 byteBuffer.position(lastCommittedPosition);
                 byteBuffer.limit(writePos);
                 this.fileChannel.position(lastCommittedPosition);
+                // 通过channel写入到内存
                 this.fileChannel.write(byteBuffer);
                 this.committedPosition.set(writePos);
             } catch (Throwable e) {
