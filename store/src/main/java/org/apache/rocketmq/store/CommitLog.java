@@ -666,8 +666,14 @@ public class CommitLog {
         if (elapsedTimeInLock > 500) {
             log.warn("[NOTIFYME]putMessage in lock cost time(ms)={}, bodyLength={} AppendMessageResult={}", elapsedTimeInLock, msg.getBody().length, result);
         }
-        // TODO: Chase Wang   为什么要 unlockMappedFile
+        /**
+         * END_OF_FILE
+         * 写入消息用到的MappedFile是新创建的，unlockMappedFile为已经写满的MappedFile
+         * unlockMappedFile中启用了一个延迟任务，该任务中做了 mappedFile.munlock();
+         * 原因是创建MappedFile的时候，如果开启了预热，为了防止OS因内存不够，将刚刚映射的内存回收，做了内存锁死操作，不让OS swap当前分配的内存地址
+         */
         if (null != unlockMappedFile && this.defaultMessageStore.getMessageStoreConfig().isWarmMapedFileEnable()) {
+            // 新的MappedFile，并且启用了预热开关
             this.defaultMessageStore.unlockMappedFile(unlockMappedFile);
         }
 
