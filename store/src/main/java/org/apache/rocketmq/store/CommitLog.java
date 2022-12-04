@@ -667,7 +667,7 @@ public class CommitLog {
             log.warn("[NOTIFYME]putMessage in lock cost time(ms)={}, bodyLength={} AppendMessageResult={}", elapsedTimeInLock, msg.getBody().length, result);
         }
         /**
-         * END_OF_FILE 8
+         * END_OF_FILE ----
          * 写入消息用到的MappedFile是新创建的，unlockMappedFile为已经写满的MappedFile
          * unlockMappedFile中启用了一个延迟任务，该任务中做了 mappedFile.munlock();
          * 原因是创建MappedFile的时候，如果开启了预热，为了防止OS因内存不够，将刚刚映射的内存回收，做了内存锁死操作，不让OS swap当前分配的内存地址
