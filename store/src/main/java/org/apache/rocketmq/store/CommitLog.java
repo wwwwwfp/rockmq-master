@@ -1178,7 +1178,7 @@ public class CommitLog {
                         // two times the flush
                         boolean flushOK = false;
                         /**
-                         * why 2 ？？
+                         * why 2 ？
                          * 如果这个处理周期有新的MappedFile产生，新的MappedFile要重新触发一次
                          */
                         for (int i = 0; i < 2 && !flushOK; i++) {
@@ -1219,6 +1219,7 @@ public class CommitLog {
             while (!this.isStopped()) {
                 try {
                     // 等待通知，如果有新数据，可提前结束等待
+                    // 在执行doCommit 方法之前，在 waitForRunning中会嗲用 swapRequests 逻辑
                     this.waitForRunning(10);
                     // 执行刷盘
                     this.doCommit();
@@ -1234,7 +1235,7 @@ public class CommitLog {
             } catch (InterruptedException e) {
                 CommitLog.log.warn("GroupCommitService Exception, ", e);
             }
-
+            // 执行 doCommit 操作之前，做swapRequest操作
             synchronized (this) {
                 this.swapRequests();
             }
