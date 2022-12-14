@@ -303,9 +303,12 @@ public class ConsumeMessageConcurrentlyService implements ConsumeMessageService 
             default:
                 break;
         }
-
+        // 从本地缓存processQueue中删除消息，并返回删除后第红黑树的第一个数据的key
+        // 因为红黑树天然有序，第一个及删除后最小的（红黑树中最老得消息）
         long offset = consumeRequest.getProcessQueue().removeMessage(consumeRequest.getMsgs());
         if (offset >= 0 && !consumeRequest.getProcessQueue().isDropped()) {
+            // 确认offset，告诉broker已经消费了
+            // 这里面的实现：将结果放到缓存中，然后通过定时线程将这个缓存进行上报
             this.defaultMQPushConsumerImpl.getOffsetStore().updateOffset(consumeRequest.getMessageQueue(), offset, true);
         }
     }

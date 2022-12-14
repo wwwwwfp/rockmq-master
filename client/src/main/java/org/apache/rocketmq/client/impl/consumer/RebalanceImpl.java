@@ -270,7 +270,11 @@ public abstract class RebalanceImpl {
                 if (mqSet != null && cidAll != null) {
                     List<MessageQueue> mqAll = new ArrayList<MessageQueue>();
                     mqAll.addAll(mqSet);
-
+                    // 让每一个Consumer拥有同样的视图，在后面分配策略进行分配的时候，如果视图一样，理论上计算的结果也一致
+                    /**
+                     * 例如：两个consumer  C1 和 C2   四个消费队列 q1 q2 q3 q4
+                     *      这样算法一样，入参一样，C1计算的结果 C1应该消费q1 q2 、C2消费 q2 q3 和C2 计算的就一样
+                     */
                     Collections.sort(mqAll);
                     Collections.sort(cidAll);
 
