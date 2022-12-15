@@ -509,13 +509,16 @@ public class DefaultMessageStore implements MessageStore {
 
         GetMessageResult getResult = new GetMessageResult();
 
+        // 获取commitlog最大的物理offset
         final long maxOffsetPy = this.commitLog.getMaxOffset();
-
+        // 获取对应的queue
         ConsumeQueue consumeQueue = findConsumeQueue(topic, queueId);
         if (consumeQueue != null) {
+            // 最小offset
             minOffset = consumeQueue.getMinOffsetInQueue();
+            // 最大offset
             maxOffset = consumeQueue.getMaxOffsetInQueue();
-
+            // 判断offset合理性
             if (maxOffset == 0) {
                 status = GetMessageStatus.NO_MESSAGE_IN_QUEUE;
                 nextBeginOffset = nextOffsetCorrection(offset, 0);
@@ -533,6 +536,7 @@ public class DefaultMessageStore implements MessageStore {
                     nextBeginOffset = nextOffsetCorrection(offset, maxOffset);
                 }
             } else {
+                // 正常情况下执行的逻辑
                 SelectMappedBufferResult bufferConsumeQueue = consumeQueue.getIndexBuffer(offset);
                 if (bufferConsumeQueue != null) {
                     try {
@@ -585,7 +589,13 @@ public class DefaultMessageStore implements MessageStore {
 
                                 continue;
                             }
-
+                            /**
+                             * 从commitLog中一个一个取
+                             * 为什么不直接取多个size ？？
+                             *      因为对于queue来说，offset是连续的，但是当commitlog中的message分布在不同queue时，
+                             *      同一个连续的偏移量，实际在commitlog中是不连续的
+                             *      而RocketMq中采用的是MappedFile的方式取值的，所以IO问题不需要担心
+                             */
                             SelectMappedBufferResult selectResult = this.commitLog.getMessage(offsetPy, sizePy);
                             if (null == selectResult) {
                                 if (getResult.getBufferTotalSize() == 0) {
