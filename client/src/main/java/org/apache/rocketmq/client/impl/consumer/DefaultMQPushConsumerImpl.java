@@ -511,6 +511,7 @@ public class DefaultMQPushConsumerImpl implements MQConsumerInner {
     public void sendMessageBack(MessageExt msg, int delayLevel, final String brokerName)
         throws RemotingException, MQBrokerException, InterruptedException, MQClientException {
         try {
+            // 原Msg在哪个Broker，这次还会send到哪个Broker
             String brokerAddr = (null != brokerName) ? this.mQClientFactory.findBrokerAddressInPublish(brokerName)
                 : RemotingHelper.parseSocketAddressAddr(msg.getStoreHost());
             this.mQClientFactory.getMQClientAPIImpl().consumerSendMessageBack(brokerAddr, msg,
@@ -575,6 +576,7 @@ public class DefaultMQPushConsumerImpl implements MQConsumerInner {
 
                 this.checkConfig();
 
+                // copy 订阅关系，主要是为了绑定系统Topic RetryTopic的订阅关系（延时Topic）
                 this.copySubscription();
 
                 if (this.defaultMQPushConsumer.getMessageModel() == MessageModel.CLUSTERING) {
