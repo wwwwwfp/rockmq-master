@@ -1856,6 +1856,7 @@ public class DefaultMessageStore implements MessageStore {
 
                         for (int readSize = 0; readSize < result.getSize() && doNext; ) {
                             // 读取一个完整的Msg，构建对应的 DispatchRequest 对象
+                            // 针对 延迟消息将Tag对应的HashCode更改为具体消费的一个时间戳
                             DispatchRequest dispatchRequest =
                                 DefaultMessageStore.this.commitLog.checkMessageAndReturnSize(result.getByteBuffer(), false, false);
                             int size = dispatchRequest.getBufferSize() == -1 ? dispatchRequest.getMsgSize() : dispatchRequest.getBufferSize();

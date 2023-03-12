@@ -577,6 +577,7 @@ public class DefaultMQPushConsumerImpl implements MQConsumerInner {
                 this.checkConfig();
 
                 // copy 订阅关系，主要是为了绑定系统Topic RetryTopic的订阅关系（延时Topic）
+                // 之后 clustering 模式会绑定这个订阅关系
                 this.copySubscription();
 
                 if (this.defaultMQPushConsumer.getMessageModel() == MessageModel.CLUSTERING) {
@@ -845,6 +846,7 @@ public class DefaultMQPushConsumerImpl implements MQConsumerInner {
                 case BROADCASTING:
                     break;
                 case CLUSTERING:
+                    // 只有Clustering模式回订阅这个重试的Topic
                     final String retryTopic = MixAll.getRetryTopic(this.defaultMQPushConsumer.getConsumerGroup());
                     SubscriptionData subscriptionData = FilterAPI.buildSubscriptionData(this.defaultMQPushConsumer.getConsumerGroup(),
                         retryTopic, SubscriptionData.SUB_ALL);
