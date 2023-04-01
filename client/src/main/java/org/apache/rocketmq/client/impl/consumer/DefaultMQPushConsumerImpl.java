@@ -323,11 +323,18 @@ public class DefaultMQPushConsumerImpl implements MQConsumerInner {
                             if (pullResult.getMsgFoundList() == null || pullResult.getMsgFoundList().isEmpty()) {
                                 DefaultMQPushConsumerImpl.this.executePullRequestImmediately(pullRequest);
                             } else {
+                                // 存在消息
                                 firstMsgOffset = pullResult.getMsgFoundList().get(0).getQueueOffset();
 
                                 DefaultMQPushConsumerImpl.this.getConsumerStatsManager().incPullTPS(pullRequest.getConsumerGroup(), pullRequest.getMessageQueue().getTopic(), pullResult.getMsgFoundList().size());
-
+                                // put MessageList 到TreeMap中
                                 boolean dispatchToConsume = processQueue.putMessage(pullResult.getMsgFoundList());
+                                // 并将Msg分组交给消费线程
+
+                                /**
+                                 * 如果拉取到的数量小于等于consumeBatchSize ，直接将这一堆Msg 封装成一个ConsumeRequest的Runnable 提交给 consumeExecutor 线程
+                                 * 如果大于consumeBatchSize，则将这批消息按照consumeBatchSize 进行分组，然后分批提交到consumeExecutor线程（ConsumeRequest）
+                                 */
                                 DefaultMQPushConsumerImpl.this.consumeMessageService.submitConsumeRequest(pullResult.getMsgFoundList(), processQueue, pullRequest.getMessageQueue(), dispatchToConsume);
 
                                 if (DefaultMQPushConsumerImpl.this.defaultMQPushConsumer.getPullInterval() > 0) {
@@ -360,11 +367,11 @@ public class DefaultMQPushConsumerImpl implements MQConsumerInner {
                             DefaultMQPushConsumerImpl.this.executePullRequestImmediately(pullRequest);
                             break;
                         case OFFSET_ILLEGAL:
+                            // 消息不合法，移除
                             log.warn("the pull request offset illegal, {} {}", pullRequest.toString(), pullResult.toString());
                             pullRequest.setNextOffset(pullResult.getNextBeginOffset());
                             pullRequest.getProcessQueue().setDropped(true);
                             DefaultMQPushConsumerImpl.this.executeTaskLater(new Runnable() {
-
                                 @Override
                                 public void run() {
                                     try {

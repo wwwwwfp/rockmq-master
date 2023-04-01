@@ -212,6 +212,8 @@ public class ConsumeMessageConcurrentlyService implements ConsumeMessageService 
             // ConsumeRequest 是一个runable
             ConsumeRequest consumeRequest = new ConsumeRequest(msgs, processQueue, messageQueue);
             try {
+                // 将ConsumeRequest 交给专门的线程池完成对应的消费逻辑
+                // 具体的实现在ConsumeRequest Runnable的run方法中
                 this.consumeExecutor.submit(consumeRequest);
             } catch (RejectedExecutionException e) {
                 this.submitConsumeRequestLater(consumeRequest);
