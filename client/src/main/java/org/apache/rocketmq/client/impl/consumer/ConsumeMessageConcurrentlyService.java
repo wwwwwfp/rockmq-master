@@ -254,12 +254,13 @@ public class ConsumeMessageConcurrentlyService implements ConsumeMessageService 
         }
     }
 
+
     public void processConsumeResult(
         final ConsumeConcurrentlyStatus status,
         final ConsumeConcurrentlyContext context,
         final ConsumeRequest consumeRequest
     ) {
-        int ackIndex = context.getAckIndex();
+        int ackIndex = context.getAckIndex(); // 默认ackIndex = Integer.MAX_VALUE;
 
         if (consumeRequest.getMsgs().isEmpty())
             return;
@@ -292,7 +293,14 @@ public class ConsumeMessageConcurrentlyService implements ConsumeMessageService 
                 break;
             case CLUSTERING:
                 List<MessageExt> msgBackFailed = new ArrayList<MessageExt>(consumeRequest.getMsgs().size());
+
+                /**
+                 * 失败的时候 ackIndex = -1;
+                 * 成功的时候 ackIndex = consumeRequest.getMsgs().size() - 1;
+                 */
+                // 成功的时候，i = consumeRequest.getMsgs().size() - 1 + 1  不满足 i < consumeRequest.getMsgs().size()
                 for (int i = ackIndex + 1; i < consumeRequest.getMsgs().size(); i++) {
+                    // 只有失败逻辑才会进入该逻辑
                     MessageExt msg = consumeRequest.getMsgs().get(i);
                     // 消费失败后，将该msg重新send到Broker端
                     boolean result = this.sendMessageBack(msg, context);
@@ -302,6 +310,7 @@ public class ConsumeMessageConcurrentlyService implements ConsumeMessageService 
                     }
                 }
 
+                // 对于重试失的消息，分组以consumeRequest 任务的形式重新提交给消费线程处理（上篇内容已说明）
                 if (!msgBackFailed.isEmpty()) {
                     consumeRequest.getMsgs().removeAll(msgBackFailed);
 
@@ -326,6 +335,7 @@ public class ConsumeMessageConcurrentlyService implements ConsumeMessageService 
     }
 
     public boolean sendMessageBack(final MessageExt msg, final ConsumeConcurrentlyContext context) {
+        // delayLevel 延迟等级，默认是0
         int delayLevel = context.getDelayLevelWhenNextConsume();
 
         // Wrap topic with namespace before sending back message.
