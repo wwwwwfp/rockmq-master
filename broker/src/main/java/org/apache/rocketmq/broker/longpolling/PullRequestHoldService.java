@@ -62,6 +62,10 @@ public class PullRequestHoldService extends ServiceThread {
         sb.append(queueId);
         return sb.toString();
     }
+    @Override
+    public String getServiceName() {
+        return PullRequestHoldService.class.getSimpleName();
+    }
 
     @Override
     public void run() {
@@ -73,7 +77,6 @@ public class PullRequestHoldService extends ServiceThread {
                 } else {
                     this.waitForRunning(this.brokerController.getBrokerConfig().getShortPollingTimeMills());
                 }
-
                 long beginLockTimestamp = this.systemClock.now();
                 this.checkHoldRequest();
                 long costTime = this.systemClock.now() - beginLockTimestamp;
@@ -84,15 +87,8 @@ public class PullRequestHoldService extends ServiceThread {
                 log.warn(this.getServiceName() + " service has exception. ", e);
             }
         }
-
         log.info("{} service end", this.getServiceName());
     }
-
-    @Override
-    public String getServiceName() {
-        return PullRequestHoldService.class.getSimpleName();
-    }
-
     private void checkHoldRequest() {
         for (String key : this.pullRequestTable.keySet()) {
             String[] kArray = key.split(TOPIC_QUEUEID_SEPARATOR);
@@ -166,4 +162,7 @@ public class PullRequestHoldService extends ServiceThread {
             }
         }
     }
+
+
+
 }

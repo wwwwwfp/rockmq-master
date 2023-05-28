@@ -436,7 +436,7 @@ public class DefaultMQPushConsumerImpl implements MQConsumerInner {
                 this.defaultMQPushConsumer.getPullBatchSize(),
                 sysFlag,
                 commitOffsetValue,
-                BROKER_SUSPEND_MAX_TIME_MILLIS,
+                BROKER_SUSPEND_MAX_TIME_MILLIS, // 长轮询参数，拉取消息的时候 broker 没有消息并不立即返回，而是先hold住该请求，超时时间默认15s
                 CONSUMER_TIMEOUT_MILLIS_WHEN_SUSPEND,
                 CommunicationMode.ASYNC,
                 pullCallback
